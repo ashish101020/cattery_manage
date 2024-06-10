@@ -5,14 +5,19 @@ async function loginGet(req, res) {
     if (req.session.user) {
         res.redirect('/home');
     } else {
-        res.sendFile("/loginpage");
+        res.render('login');
     }
 }
 async function loginPost(req, res) {
-    const { email, password } = req.body;
+    const { username, password } = req.body;
+
+    // Check for missing email or password
+    if (!username || !password) {
+        return res.status(400).send('Username and password are required');
+    }
 
     const query = "SELECT * FROM users WHERE email = ?";
-    connection.query(query, [email], async (error, results) => {
+    connection.query(query, [username], async (error, results) => {
         if (error) {
             console.error('Error executing query:', error);
             return res.status(500).send('Internal Server Error');
@@ -21,16 +26,17 @@ async function loginPost(req, res) {
         if (results.length === 1) {
             const user = results[0];
             const passwordMatch = await bcrypt.compare(password, user.password);
-            
+
             if (passwordMatch) {
                 req.session.user = user;
                 return res.redirect('/home');
             }
         }
 
-        res.send('Invalid username or password');
+        res.status(401).send('Invalid email or password');
     });
 }
+
 
 
 async function home(req, res) {
@@ -41,32 +47,43 @@ async function home(req, res) {
     }
 }
 
-async function logout (req, res) {
+async function logout(req, res) {
     req.session.destroy((err) => {
         if (err) {
             console.error('Error destroying session:', err);
+            return res.status(500).send('Internal Server Error');
         }
         res.redirect('/login');
     });
 }
 
 async function signupGet(req, res) {
-    res.sendFile("/signupPage");
+    res.render('signup'); // Assuming 'signupPage.ejs' is your signup page template
 }
+
 async function signupPost(req, res) {
-    const { email, password } = req.body;
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const { username, password } = req.body;
 
-    const sql = "INSERT INTO users (email, password) VALUES (?, ?)";
-    connection.query(sql, [email, hashedPassword], (error, results) => {
-        if (error) {
-            console.error('Error inserting user:', error);
-            return res.status(500).send('Error registering user');
-        }
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
 
-        res.status(200).send('User registered successfully');
-    });
+        const sql = "INSERT INTO users (username, password) VALUES (?, ?)";
+        connection.query(sql, [username, hashedPassword], (error, results) => {
+            if (error) {
+                console.error('Error inserting user:', error);
+                return res.status(500).send('Error registering user');
+            }
+
+            // Redirect back to the previous page (HTTP referer)
+            const previousPage = req.header('Referer') || '/'; // If referer not available, redirect to root
+            res.redirect(previousPage);
+        });
+    } catch (error) {
+        console.error('Error hashing password:', error);
+        res.status(500).send('Internal Server Error');
+    }
 }
+
 
 function isAuthenticated(req, res, next) {
     if (req.session.user) {

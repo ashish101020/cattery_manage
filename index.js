@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const session = require('express-session');
 const connection = require('./connetion.js');
 const { loginGet, loginPost, home, logout, signupGet, signupPost, isAuthenticated } = require('./controllers/login.js');
 
@@ -20,15 +21,16 @@ connection.connect((error) => {
 });
 
 app.use(session({
-    secret: 'secret',
+    secret: 'your_secret_key',
     resave: false,
-    saveUninitialized: false
+    saveUninitialized: true,
+    cookie: { secure: false } // Set 'secure: true' if using HTTPS
 }));
 
 
 // Authentication route
-app.post('/login', loginPost);
 app.get('/login', loginGet);
+app.post('/login', loginPost);
 
 // Middleware to check if the user is authenticated
 
@@ -43,5 +45,8 @@ app.get('/logout', logout);
 
 
 app.get('/signup', signupGet);
-
 app.post('/signup', signupPost);
+
+app.listen(PORT, () => {
+    console.log(`port listen at ${PORT}`)
+});
